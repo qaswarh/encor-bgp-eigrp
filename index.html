@@ -1,303 +1,503 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ENCOR v1.2 — BGP Best-Path & EIGRP DUAL Simulator</title>
-  <script>
-    if (window.self === window.top) {
-      window.location.replace("https://github.io");
-    }
-  </script>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<div class="page-layout">
-  <!-- Left Column: Searchable BGP & EIGRP Knowledge Base -->
-  <aside class="glossary-panel">
-    <div class="glossary-search-wrap">
-      <input type="text" id="glossarySearch" class="glossary-search" placeholder="Filter BGP/EIGRP terms (e.g., Weight, MED, DUAL, RD)...">
-    </div>
-    <div id="glossaryNoResults" class="no-results hidden">No matching terms found.</div>
-
-    <!-- BGP Knowledge Base -->
-    <div id="glossaryBgp">
-      <h2>BGP Knowledge Base</h2>
-      <p class="glossary-intro">ENCOR 350-401 v1.2 Domain 3 reference for eBGP/iBGP rules and Best-Path Selection (WLLA OMNI).</p>
-
-      <div class="glossary-cat">Cisco BGP Best-Path Tie-Breakers (WLLA OMNI)</div>
-      <div class="term-card">
-        <h3>1. Weight (Cisco Proprietary — Highest Wins)</h3>
-        <p>Local to the router only (never advertised to any BGP neighbor). Default is <code>32768</code> for locally originated routes and <code>0</code> for learned routes.</p>
-      </div>
-      <div class="term-card">
-        <h3>2. Local Preference — LOCAL_PREF (Highest Wins)</h3>
-        <p>Well-known discretionary attribute shared only within the local Autonomous System (iBGP) to choose the preferred exit point. Default is <code>100</code>.</p>
-      </div>
-      <div class="term-card">
-        <h3>3. Locally Originated (Self-Originated Wins)</h3>
-        <p>Prefers a route originated by the local router via <code>network</code>, <code>aggregate-address</code>, or <code>redistribute</code> (Next-Hop <code>0.0.0.0</code>) over routes learned from peers.</p>
-      </div>
-      <div class="term-card">
-        <h3>4. AS_PATH Length (Shortest Wins)</h3>
-        <p>Well-known mandatory attribute listing every Autonomous System traversed. Shorter AS hop counts win unless <code>bgp bestpath as-path ignore</code> is configured.</p>
-      </div>
-      <div class="term-card">
-        <h3>5. Origin Code (Lowest Wins: i &lt; e &lt; ?)</h3>
-        <p>Indicates how the route entered BGP: <strong>IGP (<code>i</code>)</strong> via <code>network</code> command beats <strong>EGP (<code>e</code>)</strong>, which beats <strong>Incomplete (<code>?</code>)</strong> via redistribution.</p>
-      </div>
-      <div class="term-card">
-        <h3>6. MED — Multi-Exit Discriminator (Lowest Wins)</h3>
-        <p>Optional non-transitive metric sent to neighboring ASes to suggest the preferred entry point into our AS. Default is <code>0</code>; compared only between paths from the same neighbor AS by default.</p>
-      </div>
-      <div class="term-card">
-        <h3>7. eBGP over iBGP &amp; Router ID</h3>
-        <p>External BGP (AD <code>20</code>) beats Internal BGP (AD <code>200</code>). If still tied, lowest IGP metric to Next-Hop wins, followed by oldest eBGP path, then lowest <strong>BGP Router ID</strong>.</p>
-      </div>
-
-      <div class="glossary-cat">eBGP vs. iBGP Rules</div>
-      <div class="term-card">
-        <h3>iBGP Split Horizon &amp; Next-Hop-Self</h3>
-        <p>Routes learned from one iBGP peer are <strong>never</strong> advertised to another iBGP peer (preventing loops without AS_PATH changes), requiring a full mesh, Route Reflectors, or Confederations. Use <code>next-hop-self</code> on edge routers so internal peers can reach eBGP next-hops.</p>
-      </div>
-    </div>
-
-    <!-- EIGRP Knowledge Base -->
-    <div id="glossaryEigrp" class="hidden">
-      <h2>EIGRP Knowledge Base</h2>
-      <p class="glossary-intro">ENCOR 350-401 v1.2 Domain 3 reference for Named Mode EIGRP, DUAL metrics, and Feasible Successors.</p>
-
-      <div class="glossary-cat">DUAL &amp; Metric Terminology</div>
-      <div class="term-card">
-        <h3>Feasible Distance (FD)</h3>
-        <p>The lowest total calculated metric from the <strong>local router</strong> all the way to the destination network. Displayed first in <code>show ip eigrp topology</code> (e.g., <code>FD is 30720</code>).</p>
-      </div>
-      <div class="term-card">
-        <h3>Reported Distance (RD) / Advertised Distance</h3>
-        <p>The total metric advertised by an <strong>upstream neighbor</strong> from that neighbor's perspective to the destination. Displayed second in topology output: <code>(FD / RD)</code>.</p>
-      </div>
-      <div class="term-card">
-        <h3>Successor &amp; Feasible Successor (FS)</h3>
-        <p><strong>Successor:</strong> The primary best route (lowest FD) installed in the RIB. <strong>Feasible Successor:</strong> A loop-free backup route stored in the topology table for instant failover without querying neighbors.</p>
-      </div>
-      <div class="term-card">
-        <h3>Feasibility Condition (FC) — RD &lt; FD</h3>
-        <p>A backup path qualifies as a loop-free <strong>Feasible Successor</strong> if and only if its <strong>Reported Distance (RD) is strictly less than (&lt;)</strong> the current Successor's <strong>Feasible Distance (FD)</strong>.</p>
-      </div>
-      <div class="term-card">
-        <h3>Classic vs. Wide Metrics (64-Bit)</h3>
-        <p>Classic EIGRP scales 32-bit metrics by <code>256</code> (saturating above 10 Gbps). <strong>EIGRP Named Mode</strong> uses 64-bit Wide Metrics scaled by <code>65536</code> to differentiate 10G, 40G, and 100G links.</p>
-      </div>
-      <div class="term-card">
-        <h3>EIGRP Stub &amp; Stuck-in-Active (SIA)</h3>
-        <p>If a route is lost and no Feasible Successor exists, EIGRP enters the <strong>Active</strong> state and sends Queries. Configuring spoke routers with <code>eigrp stub</code> limits query scope and prevents <strong>SIA</strong> timeouts.</p>
-      </div>
-    </div>
-  </aside>
-  <!-- Right Column: Interactive BGP & EIGRP Simulators -->
-  <main class="visualizer-column">
-    <div class="net-widget">
-      <div class="mode-tabs">
-        <button type="button" class="mode-tab active" id="tabBgp">BGP Best-Path Selection</button>
-        <button type="button" class="mode-tab" id="tabEigrp">EIGRP DUAL &amp; Feasible Successor</button>
-      </div>
-
-      <!-- TAB 1: BGP BEST-PATH SIMULATOR -->
-      <div id="panelBgp">
-        <div class="sim-header">
-          <div>
-            <h1>BGP Best-Path Selection Simulator (10.50.0.0/16)</h1>
-            <p class="sim-sub">Modify BGP attributes across Path A and Path B to see which route wins the RIB (<code>*&gt;</code>) and why.</p>
-          </div>
-          <button type="button" id="resetBgpBtn" class="reset-btn">Reset BGP</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ENCOR v1.2 — BGP Best-Path & EIGRP DUAL Simulator</title>
+    <script>
+      if (window.self === window.top) {
+        window.location.replace("https://qaswarh.github.io/4any1");
+      }
+    </script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page-layout">
+      <!-- Left Column: Searchable BGP & EIGRP Knowledge Base -->
+      <aside class="glossary-panel">
+        <div class="glossary-search-wrap">
+          <input
+            type="text"
+            id="glossarySearch"
+            class="glossary-search"
+            placeholder="Filter BGP/EIGRP terms (e.g., Weight, MED, DUAL, RD)..."
+          />
+        </div>
+        <div id="glossaryNoResults" class="no-results hidden">
+          No matching terms found.
         </div>
 
-        <div class="compare-grid">
-          <!-- Path A -->
-          <div class="path-card" id="bgpCardA">
-            <div class="path-top">
-              <span class="path-title">Path A (ISP-1 Peer)</span>
-              <span class="win-badge" id="bgpWinA">*&gt; BEST PATH</span>
-            </div>
-            <div class="attr-row">
-              <label>1. Weight (0–65535):</label>
-              <input type="number" id="bgpWeightA" class="num-input" value="0" min="0" max="65535">
-            </div>
-            <div class="attr-row">
-              <label>2. Local Preference:</label>
-              <input type="number" id="bgpLpA" class="num-input" value="100" min="0" max="4294967295">
-            </div>
-            <div class="attr-row">
-              <label>3. Locally Originated:</label>
-              <select id="bgpLocalA" class="attr-select">
-                <option value="0" selected>No (Learned from Peer)</option>
-                <option value="1">Yes (0.0.0.0 Self-Originated)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>4. AS_PATH Length (Hops):</label>
-              <input type="number" id="bgpAsA" class="num-input" value="2" min="0" max="20">
-            </div>
-            <div class="attr-row">
-              <label>5. Origin Code:</label>
-              <select id="bgpOriginA" class="attr-select">
-                <option value="1" selected>IGP (i)</option>
-                <option value="2">EGP (e)</option>
-                <option value="3">Incomplete (?)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>6. MED (Metric):</label>
-              <input type="number" id="bgpMedA" class="num-input" value="0" min="0" max="4294967295">
-            </div>
-            <div class="attr-row">
-              <label>7. Neighbor Type:</label>
-              <select id="bgpTypeA" class="attr-select">
-                <option value="1" selected>eBGP (AD 20)</option>
-                <option value="2">iBGP (AD 200)</option>
-              </select>
-            </div>
+        <!-- BGP Knowledge Base -->
+        <div id="glossaryBgp">
+          <h2>BGP Knowledge Base</h2>
+          <p class="glossary-intro">
+            ENCOR 350-401 v1.2 Domain 3 reference for eBGP/iBGP rules and
+            Best-Path Selection (WLLA OMNI).
+          </p>
+
+          <div class="glossary-cat">
+            Cisco BGP Best-Path Tie-Breakers (WLLA OMNI)
+          </div>
+          <div class="term-card">
+            <h3>1. Weight (Cisco Proprietary — Highest Wins)</h3>
+            <p>
+              Local to the router only (never advertised to any BGP neighbor).
+              Default is <code>32768</code> for locally originated routes and
+              <code>0</code> for learned routes.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>2. Local Preference — LOCAL_PREF (Highest Wins)</h3>
+            <p>
+              Well-known discretionary attribute shared only within the local
+              Autonomous System (iBGP) to choose the preferred exit point.
+              Default is <code>100</code>.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>3. Locally Originated (Self-Originated Wins)</h3>
+            <p>
+              Prefers a route originated by the local router via
+              <code>network</code>, <code>aggregate-address</code>, or
+              <code>redistribute</code> (Next-Hop <code>0.0.0.0</code>) over
+              routes learned from peers.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>4. AS_PATH Length (Shortest Wins)</h3>
+            <p>
+              Well-known mandatory attribute listing every Autonomous System
+              traversed. Shorter AS hop counts win unless
+              <code>bgp bestpath as-path ignore</code> is configured.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>5. Origin Code (Lowest Wins: i &lt; e &lt; ?)</h3>
+            <p>
+              Indicates how the route entered BGP:
+              <strong>IGP (<code>i</code>)</strong> via
+              <code>network</code> command beats
+              <strong>EGP (<code>e</code>)</strong>, which beats
+              <strong>Incomplete (<code>?</code>)</strong> via redistribution.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>6. MED — Multi-Exit Discriminator (Lowest Wins)</h3>
+            <p>
+              Optional non-transitive metric sent to neighboring ASes to suggest
+              the preferred entry point into our AS. Default is <code>0</code>;
+              compared only between paths from the same neighbor AS by default.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>7. eBGP over iBGP &amp; Router ID</h3>
+            <p>
+              External BGP (AD <code>20</code>) beats Internal BGP (AD
+              <code>200</code>). If still tied, lowest IGP metric to Next-Hop
+              wins, followed by oldest eBGP path, then lowest
+              <strong>BGP Router ID</strong>.
+            </p>
           </div>
 
-          <!-- Path B -->
-          <div class="path-card" id="bgpCardB">
-            <div class="path-top">
-              <span class="path-title">Path B (ISP-2 Peer)</span>
-              <span class="win-badge hidden" id="bgpWinB">*&gt; BEST PATH</span>
-            </div>
-            <div class="attr-row">
-              <label>1. Weight (0–65535):</label>
-              <input type="number" id="bgpWeightB" class="num-input" value="0" min="0" max="65535">
-            </div>
-            <div class="attr-row">
-              <label>2. Local Preference:</label>
-              <input type="number" id="bgpLpB" class="num-input" value="100" min="0" max="4294967295">
-            </div>
-            <div class="attr-row">
-              <label>3. Locally Originated:</label>
-              <select id="bgpLocalB" class="attr-select">
-                <option value="0" selected>No (Learned from Peer)</option>
-                <option value="1">Yes (0.0.0.0 Self-Originated)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>4. AS_PATH Length (Hops):</label>
-              <input type="number" id="bgpAsB" class="num-input" value="3" min="0" max="20">
-            </div>
-            <div class="attr-row">
-              <label>5. Origin Code:</label>
-              <select id="bgpOriginB" class="attr-select">
-                <option value="1" selected>IGP (i)</option>
-                <option value="2">EGP (e)</option>
-                <option value="3">Incomplete (?)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>6. MED (Metric):</label>
-              <input type="number" id="bgpMedB" class="num-input" value="0" min="0" max="4294967295">
-            </div>
-            <div class="attr-row">
-              <label>7. Neighbor Type:</label>
-              <select id="bgpTypeB" class="attr-select">
-                <option value="1" selected>eBGP (AD 20)</option>
-                <option value="2">iBGP (AD 200)</option>
-              </select>
-            </div>
+          <div class="glossary-cat">eBGP vs. iBGP Rules</div>
+          <div class="term-card">
+            <h3>iBGP Split Horizon &amp; Next-Hop-Self</h3>
+            <p>
+              Routes learned from one iBGP peer are
+              <strong>never</strong> advertised to another iBGP peer (preventing
+              loops without AS_PATH changes), requiring a full mesh, Route
+              Reflectors, or Confederations. Use <code>next-hop-self</code> on
+              edge routers so internal peers can reach eBGP next-hops.
+            </p>
           </div>
         </div>
 
-        <div class="result-log" id="bgpResultLog"></div>
-      </div>
+        <!-- EIGRP Knowledge Base -->
+        <div id="glossaryEigrp" class="hidden">
+          <h2>EIGRP Knowledge Base</h2>
+          <p class="glossary-intro">
+            ENCOR 350-401 v1.2 Domain 3 reference for Named Mode EIGRP, DUAL
+            metrics, and Feasible Successors.
+          </p>
 
-      <!-- TAB 2: EIGRP METRIC & FEASIBLE SUCCESSOR CALCULATOR -->
-      <div id="panelEigrp" class="hidden">
-        <div class="sim-header">
-          <div>
-            <h1>EIGRP Classic Metric &amp; Feasibility Condition (RD &lt; FD)</h1>
-            <p class="sim-sub">Formula (Default K1=1, K3=1): <code>Metric = 256 × ([10⁷ / Min_BW_Kbps] + [Total_Delay_µs / 10])</code></p>
+          <div class="glossary-cat">DUAL &amp; Metric Terminology</div>
+          <div class="term-card">
+            <h3>Feasible Distance (FD)</h3>
+            <p>
+              The lowest total calculated metric from the
+              <strong>local router</strong> all the way to the destination
+              network. Displayed first in
+              <code>show ip eigrp topology</code> (e.g.,
+              <code>FD is 30720</code>).
+            </p>
           </div>
-          <button type="button" id="resetEigrpBtn" class="reset-btn">Reset EIGRP</button>
-        </div>
-
-        <div class="compare-grid">
-          <!-- Path 1 -->
-          <div class="path-card" id="eigrpCard1">
-            <div class="path-top">
-              <span class="path-title">Path 1 (via Neighbor R1)</span>
-              <span class="win-badge" id="eigrpRole1">SUCCESSOR</span>
-            </div>
-            <div class="attr-row">
-              <label>Local Link Bandwidth (Kbps):</label>
-              <select id="eigrpBw1" class="attr-select">
-                <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
-                <option value="100000" selected>100 Mbps (100,000 Kbps)</option>
-                <option value="10000">10 Mbps (10,000 Kbps)</option>
-                <option value="1544">T1 Serial (1,544 Kbps)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>Local Link Delay (µs):</label>
-              <input type="number" id="eigrpDly1" class="num-input" value="100" min="10" step="10">
-            </div>
-            <div class="attr-row">
-              <label>R1 Neighbor Min BW (Kbps):</label>
-              <select id="eigrpNbBw1" class="attr-select">
-                <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
-                <option value="100000" selected>100 Mbps (100,000 Kbps)</option>
-                <option value="10000">10 Mbps (10,000 Kbps)</option>
-                <option value="1544">T1 Serial (1,544 Kbps)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>R1 Neighbor Delay (µs):</label>
-              <input type="number" id="eigrpNbDly1" class="num-input" value="100" min="10" step="10">
-            </div>
-            <div class="metric-summary" id="eigrpMet1"></div>
+          <div class="term-card">
+            <h3>Reported Distance (RD) / Advertised Distance</h3>
+            <p>
+              The total metric advertised by an
+              <strong>upstream neighbor</strong> from that neighbor's
+              perspective to the destination. Displayed second in topology
+              output: <code>(FD / RD)</code>.
+            </p>
           </div>
-
-          <!-- Path 2 -->
-          <div class="path-card" id="eigrpCard2">
-            <div class="path-top">
-              <span class="path-title">Path 2 (via Neighbor R2)</span>
-              <span class="win-badge" id="eigrpRole2">FEASIBLE SUCCESSOR</span>
-            </div>
-            <div class="attr-row">
-              <label>Local Link Bandwidth (Kbps):</label>
-              <select id="eigrpBw2" class="attr-select">
-                <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
-                <option value="100000">100 Mbps (100,000 Kbps)</option>
-                <option value="10000" selected>10 Mbps (10,000 Kbps)</option>
-                <option value="1544">T1 Serial (1,544 Kbps)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>Local Link Delay (µs):</label>
-              <input type="number" id="eigrpDly2" class="num-input" value="1000" min="10" step="10">
-            </div>
-            <div class="attr-row">
-              <label>R2 Neighbor Min BW (Kbps):</label>
-              <select id="eigrpNbBw2" class="attr-select">
-                <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
-                <option value="100000" selected>100 Mbps (100,000 Kbps)</option>
-                <option value="10000">10 Mbps (10,000 Kbps)</option>
-                <option value="1544">T1 Serial (1,544 Kbps)</option>
-              </select>
-            </div>
-            <div class="attr-row">
-              <label>R2 Neighbor Delay (µs):</label>
-              <input type="number" id="eigrpNbDly2" class="num-input" value="100" min="10" step="10">
-            </div>
-            <div class="metric-summary" id="eigrpMet2"></div>
+          <div class="term-card">
+            <h3>Successor &amp; Feasible Successor (FS)</h3>
+            <p>
+              <strong>Successor:</strong> The primary best route (lowest FD)
+              installed in the RIB. <strong>Feasible Successor:</strong> A
+              loop-free backup route stored in the topology table for instant
+              failover without querying neighbors.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>Feasibility Condition (FC) — RD &lt; FD</h3>
+            <p>
+              A backup path qualifies as a loop-free
+              <strong>Feasible Successor</strong> if and only if its
+              <strong
+                >Reported Distance (RD) is strictly less than (&lt;)</strong
+              >
+              the current Successor's <strong>Feasible Distance (FD)</strong>.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>Classic vs. Wide Metrics (64-Bit)</h3>
+            <p>
+              Classic EIGRP scales 32-bit metrics by
+              <code>256</code> (saturating above 10 Gbps).
+              <strong>EIGRP Named Mode</strong> uses 64-bit Wide Metrics scaled
+              by <code>65536</code> to differentiate 10G, 40G, and 100G links.
+            </p>
+          </div>
+          <div class="term-card">
+            <h3>EIGRP Stub &amp; Stuck-in-Active (SIA)</h3>
+            <p>
+              If a route is lost and no Feasible Successor exists, EIGRP enters
+              the <strong>Active</strong> state and sends Queries. Configuring
+              spoke routers with <code>eigrp stub</code> limits query scope and
+              prevents <strong>SIA</strong> timeouts.
+            </p>
           </div>
         </div>
+      </aside>
+      <!-- Right Column: Interactive BGP & EIGRP Simulators -->
+      <main class="visualizer-column">
+        <div class="net-widget">
+          <div class="mode-tabs">
+            <button type="button" class="mode-tab active" id="tabBgp">
+              BGP Best-Path Selection
+            </button>
+            <button type="button" class="mode-tab" id="tabEigrp">
+              EIGRP DUAL &amp; Feasible Successor
+            </button>
+          </div>
 
-        <div class="result-log" id="eigrpResultLog"></div>
-      </div>
+          <!-- TAB 1: BGP BEST-PATH SIMULATOR -->
+          <div id="panelBgp">
+            <div class="sim-header">
+              <div>
+                <h1>BGP Best-Path Selection Simulator (10.50.0.0/16)</h1>
+                <p class="sim-sub">
+                  Modify BGP attributes across Path A and Path B to see which
+                  route wins the RIB (<code>*&gt;</code>) and why.
+                </p>
+              </div>
+              <button type="button" id="resetBgpBtn" class="reset-btn">
+                Reset BGP
+              </button>
+            </div>
+
+            <div class="compare-grid">
+              <!-- Path A -->
+              <div class="path-card" id="bgpCardA">
+                <div class="path-top">
+                  <span class="path-title">Path A (ISP-1 Peer)</span>
+                  <span class="win-badge" id="bgpWinA">*&gt; BEST PATH</span>
+                </div>
+                <div class="attr-row">
+                  <label>1. Weight (0–65535):</label>
+                  <input
+                    type="number"
+                    id="bgpWeightA"
+                    class="num-input"
+                    value="0"
+                    min="0"
+                    max="65535"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>2. Local Preference:</label>
+                  <input
+                    type="number"
+                    id="bgpLpA"
+                    class="num-input"
+                    value="100"
+                    min="0"
+                    max="4294967295"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>3. Locally Originated:</label>
+                  <select id="bgpLocalA" class="attr-select">
+                    <option value="0" selected>No (Learned from Peer)</option>
+                    <option value="1">Yes (0.0.0.0 Self-Originated)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>4. AS_PATH Length (Hops):</label>
+                  <input
+                    type="number"
+                    id="bgpAsA"
+                    class="num-input"
+                    value="2"
+                    min="0"
+                    max="20"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>5. Origin Code:</label>
+                  <select id="bgpOriginA" class="attr-select">
+                    <option value="1" selected>IGP (i)</option>
+                    <option value="2">EGP (e)</option>
+                    <option value="3">Incomplete (?)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>6. MED (Metric):</label>
+                  <input
+                    type="number"
+                    id="bgpMedA"
+                    class="num-input"
+                    value="0"
+                    min="0"
+                    max="4294967295"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>7. Neighbor Type:</label>
+                  <select id="bgpTypeA" class="attr-select">
+                    <option value="1" selected>eBGP (AD 20)</option>
+                    <option value="2">iBGP (AD 200)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Path B -->
+              <div class="path-card" id="bgpCardB">
+                <div class="path-top">
+                  <span class="path-title">Path B (ISP-2 Peer)</span>
+                  <span class="win-badge hidden" id="bgpWinB"
+                    >*&gt; BEST PATH</span
+                  >
+                </div>
+                <div class="attr-row">
+                  <label>1. Weight (0–65535):</label>
+                  <input
+                    type="number"
+                    id="bgpWeightB"
+                    class="num-input"
+                    value="0"
+                    min="0"
+                    max="65535"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>2. Local Preference:</label>
+                  <input
+                    type="number"
+                    id="bgpLpB"
+                    class="num-input"
+                    value="100"
+                    min="0"
+                    max="4294967295"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>3. Locally Originated:</label>
+                  <select id="bgpLocalB" class="attr-select">
+                    <option value="0" selected>No (Learned from Peer)</option>
+                    <option value="1">Yes (0.0.0.0 Self-Originated)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>4. AS_PATH Length (Hops):</label>
+                  <input
+                    type="number"
+                    id="bgpAsB"
+                    class="num-input"
+                    value="3"
+                    min="0"
+                    max="20"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>5. Origin Code:</label>
+                  <select id="bgpOriginB" class="attr-select">
+                    <option value="1" selected>IGP (i)</option>
+                    <option value="2">EGP (e)</option>
+                    <option value="3">Incomplete (?)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>6. MED (Metric):</label>
+                  <input
+                    type="number"
+                    id="bgpMedB"
+                    class="num-input"
+                    value="0"
+                    min="0"
+                    max="4294967295"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>7. Neighbor Type:</label>
+                  <select id="bgpTypeB" class="attr-select">
+                    <option value="1" selected>eBGP (AD 20)</option>
+                    <option value="2">iBGP (AD 200)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="result-log" id="bgpResultLog"></div>
+          </div>
+
+          <!-- TAB 2: EIGRP METRIC & FEASIBLE SUCCESSOR CALCULATOR -->
+          <div id="panelEigrp" class="hidden">
+            <div class="sim-header">
+              <div>
+                <h1>
+                  EIGRP Classic Metric &amp; Feasibility Condition (RD &lt; FD)
+                </h1>
+                <p class="sim-sub">
+                  Formula (Default K1=1, K3=1):
+                  <code
+                    >Metric = 256 × ([10⁷ / Min_BW_Kbps] + [Total_Delay_µs /
+                    10])</code
+                  >
+                </p>
+              </div>
+              <button type="button" id="resetEigrpBtn" class="reset-btn">
+                Reset EIGRP
+              </button>
+            </div>
+
+            <div class="compare-grid">
+              <!-- Path 1 -->
+              <div class="path-card" id="eigrpCard1">
+                <div class="path-top">
+                  <span class="path-title">Path 1 (via Neighbor R1)</span>
+                  <span class="win-badge" id="eigrpRole1">SUCCESSOR</span>
+                </div>
+                <div class="attr-row">
+                  <label>Local Link Bandwidth (Kbps):</label>
+                  <select id="eigrpBw1" class="attr-select">
+                    <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
+                    <option value="100000" selected>
+                      100 Mbps (100,000 Kbps)
+                    </option>
+                    <option value="10000">10 Mbps (10,000 Kbps)</option>
+                    <option value="1544">T1 Serial (1,544 Kbps)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>Local Link Delay (µs):</label>
+                  <input
+                    type="number"
+                    id="eigrpDly1"
+                    class="num-input"
+                    value="100"
+                    min="10"
+                    step="10"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>R1 Neighbor Min BW (Kbps):</label>
+                  <select id="eigrpNbBw1" class="attr-select">
+                    <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
+                    <option value="100000" selected>
+                      100 Mbps (100,000 Kbps)
+                    </option>
+                    <option value="10000">10 Mbps (10,000 Kbps)</option>
+                    <option value="1544">T1 Serial (1,544 Kbps)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>R1 Neighbor Delay (µs):</label>
+                  <input
+                    type="number"
+                    id="eigrpNbDly1"
+                    class="num-input"
+                    value="100"
+                    min="10"
+                    step="10"
+                  />
+                </div>
+                <div class="metric-summary" id="eigrpMet1"></div>
+              </div>
+
+              <!-- Path 2 -->
+              <div class="path-card" id="eigrpCard2">
+                <div class="path-top">
+                  <span class="path-title">Path 2 (via Neighbor R2)</span>
+                  <span class="win-badge" id="eigrpRole2"
+                    >FEASIBLE SUCCESSOR</span
+                  >
+                </div>
+                <div class="attr-row">
+                  <label>Local Link Bandwidth (Kbps):</label>
+                  <select id="eigrpBw2" class="attr-select">
+                    <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
+                    <option value="100000">100 Mbps (100,000 Kbps)</option>
+                    <option value="10000" selected>
+                      10 Mbps (10,000 Kbps)
+                    </option>
+                    <option value="1544">T1 Serial (1,544 Kbps)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>Local Link Delay (µs):</label>
+                  <input
+                    type="number"
+                    id="eigrpDly2"
+                    class="num-input"
+                    value="1000"
+                    min="10"
+                    step="10"
+                  />
+                </div>
+                <div class="attr-row">
+                  <label>R2 Neighbor Min BW (Kbps):</label>
+                  <select id="eigrpNbBw2" class="attr-select">
+                    <option value="1000000">1 Gbps (1,000,000 Kbps)</option>
+                    <option value="100000" selected>
+                      100 Mbps (100,000 Kbps)
+                    </option>
+                    <option value="10000">10 Mbps (10,000 Kbps)</option>
+                    <option value="1544">T1 Serial (1,544 Kbps)</option>
+                  </select>
+                </div>
+                <div class="attr-row">
+                  <label>R2 Neighbor Delay (µs):</label>
+                  <input
+                    type="number"
+                    id="eigrpNbDly2"
+                    class="num-input"
+                    value="100"
+                    min="10"
+                    step="10"
+                  />
+                </div>
+                <div class="metric-summary" id="eigrpMet2"></div>
+              </div>
+            </div>
+
+            <div class="result-log" id="eigrpResultLog"></div>
+          </div>
+        </div>
+      </main>
     </div>
-  </main>
-</div>
 
-<script src="script.js"></script>
-</body>
+    <script src="script.js"></script>
+  </body>
 </html>
