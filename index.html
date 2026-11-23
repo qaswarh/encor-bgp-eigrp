@@ -112,16 +112,32 @@
           </div>
         </div>
 
-        <div class="glossary-cat">BGP Routing Acronyms</div>
+        <div class="glossary-cat">BGP Routing Concepts &amp; Acronyms</div>
         <div class="term-card">
-          <h3>BGP, eBGP, iBGP, AS, RIB, MED, IGP, EGP, AD</h3>
+          <h3>BGP, eBGP, iBGP, AS, RIB, NLRI, MED, IGP, EGP, AD</h3>
           <p>
-            <strong>BGP:</strong> Border Gateway Protocol (External BGP /
-            Internal BGP). <strong>AS:</strong> Autonomous System.
-            <strong>RIB:</strong> Routing Information Base (the IP routing
-            table). <strong>MED:</strong> Multi-Exit Discriminator.
-            <strong>IGP / EGP:</strong> Interior Gateway Protocol / Exterior
-            Gateway Protocol. <strong>AD:</strong> Administrative Distance.
+            <strong>BGP (Border Gateway Protocol):</strong> Path-vector
+            <strong>EGP (Exterior Gateway Protocol)</strong> using TCP port
+            <code>179</code> to exchange
+            <strong>NLRI (Network Layer Reachability Information)</strong>
+            prefixes and Path Attributes between
+            <strong>AS (Autonomous Systems)</strong>—unlike an
+            <strong>IGP (Interior Gateway Protocol)</strong> such as OSPF or
+            EIGRP that routes inside a single organization.
+            <strong>eBGP vs. iBGP:</strong> External BGP peers across different
+            AS numbers (<strong>AD — Administrative Distance</strong>
+            <code>20</code>, default TTL <code>1</code>, prepends local AS to
+            <code>AS_PATH</code>, updates <code>NEXT_HOP</code>); Internal BGP
+            peers inside the same AS (<strong>AD</strong> <code>200</code>,
+            requires full mesh, <strong>Route Reflector</strong>, or
+            Confederation because iBGP never advertises routes learned from one
+            iBGP peer to another).
+            <strong>RIB (Routing Information Base):</strong> The router's main
+            IP routing table where the single best BGP route (chosen via
+            <code>N WLLA OMNI</code>) is installed.
+            <strong>MED (Multi-Exit Discriminator):</strong> Optional
+            non-transitive attribute (lowest wins) sent to a neighboring AS to
+            influence which entry point external traffic uses into your AS.
           </p>
         </div>
 
@@ -201,17 +217,37 @@
               prevents <strong>SIA</strong> timeouts.
             </p>
           </div>
-          <div class="glossary-cat">EIGRP Acronyms</div>
+          <div class="glossary-cat">EIGRP Concepts &amp; Acronyms</div>
           <div class="term-card">
-            <h3>EIGRP, FD, RD, FS, FC, SIA, BW</h3>
+            <h3>EIGRP, DUAL, FD, RD, S, FS, FC, SIA, BW</h3>
             <p>
-              <strong>EIGRP:</strong> Enhanced Interior Gateway Routing
-              Protocol. <strong>FD:</strong> Feasible Distance.
-              <strong>RD:</strong> Reported Distance.
-              <strong>FS:</strong> Feasible Successor.
-              <strong>FC:</strong> Feasibility Condition.
-              <strong>SIA:</strong> Stuck-in-Active.
-              <strong>BW:</strong> Bandwidth.
+              <strong
+                >EIGRP (Enhanced Interior Gateway Routing Protocol):</strong
+              >
+              Cisco advanced distance-vector IGP (IP Protocol <code>88</code>,
+              multicast <code>224.0.0.10</code>; internal AD <code>90</code>,
+              external AD <code>170</code>) powered by
+              <strong>DUAL (Diffusing Update Algorithm)</strong> for sub-second
+              loop-free convergence. <strong>BW (Bandwidth):</strong> The lowest
+              interface bandwidth along a path (in Kbps), which together with
+              cumulative delay forms the default EIGRP composite metric.
+              <strong>FD vs. RD:</strong>
+              <strong>FD (Feasible Distance)</strong> is the local router's best
+              calculated total metric to a destination;
+              <strong
+                >RD (Reported Distance — also called Advertised
+                Distance)</strong
+              >
+              is a neighbor's advertised metric to reach that same destination.
+              <strong>S, FS &amp; FC:</strong> The
+              <strong>S (Successor)</strong> is the primary best route installed
+              in the routing table; a backup path qualifies as a loop-free
+              <strong>FS (Feasible Successor)</strong> only if it passes the
+              <strong>FC (Feasibility Condition)</strong>—meaning its
+              <code>RD &lt; current Successor's FD</code>.
+              <strong>SIA (Stuck-in-Active):</strong> Occurs when no FS exists
+              and a router fails to receive a DUAL Query reply within the Active
+              timer (default 3 minutes), resetting the neighbor adjacency.
             </p>
           </div>
         </div>
